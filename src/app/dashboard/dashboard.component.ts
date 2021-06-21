@@ -21,7 +21,12 @@ export class DashboardComponent implements OnInit {
               private title: Title) { }
   
   ngOnInit() {
-    this.allBooks = this.dataService.getAllBooks();
+    this.dataService.getAllBooks()           // removing assignment since no longer an array
+      .subscribe(
+          (data: Book[]) => this.allBooks = data,
+          (err: any) => console.log (err),
+          () => console.log("all done getting books")
+      );
     this.allReaders = this.dataService.getAllReaders();
     this.mostPopularBook = this.dataService.mostPopularBook;
 
