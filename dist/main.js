@@ -89,20 +89,28 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! tslib */ "mrSG");
 /* harmony import */ var _raw_loader_add_book_component_html__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! raw-loader!./add-book.component.html */ "2y6B");
 /* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/core */ "fXoL");
+/* harmony import */ var app_core_data_service__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! app/core/data.service */ "QVKM");
+
 
 
 
 let AddBookComponent = class AddBookComponent {
-    constructor() { }
+    constructor(dataService) {
+        this.dataService = dataService;
+    }
     ngOnInit() { }
+    // called when save book button is clicked
     saveBook(formValues) {
         let newBook = formValues;
         newBook.bookID = 0;
         console.log(newBook);
-        console.warn('Save new book not yet implemented.');
+        this.dataService.addBook(newBook)
+            .subscribe((data) => console.log(data), (err) => console.log(err));
     }
 };
-AddBookComponent.ctorParameters = () => [];
+AddBookComponent.ctorParameters = () => [
+    { type: app_core_data_service__WEBPACK_IMPORTED_MODULE_3__["DataService"] }
+];
 AddBookComponent = Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__decorate"])([
     Object(_angular_core__WEBPACK_IMPORTED_MODULE_2__["Component"])({
         selector: 'app-add-book',
@@ -210,13 +218,17 @@ let EditBookComponent = class EditBookComponent {
     }
     ngOnInit() {
         let bookID = parseInt(this.route.snapshot.params['id']);
-        this.selectedBook = this.dataService.getBookById(bookID);
+        this.dataService.getBookById(bookID)
+            .subscribe((data) => this.selectedBook = data, (err) => console.log(err), () => console.log('complete'));
+        this.dataService.getOldBookById(bookID)
+            .subscribe((data) => console.log(`old book title: ${data.bookTitle}`));
     }
     setMostPopular() {
         this.dataService.setMostPopularBook(this.selectedBook);
     }
     saveChanges() {
-        console.warn('Save changes to book not yet implemented.');
+        this.dataService.updateBook(this.selectedBook)
+            .subscribe((data) => console.log(`${this.selectedBook.title} updated successfully.`), (err) => console.log(err));
     }
 };
 EditBookComponent.ctorParameters = () => [
@@ -312,7 +324,9 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! tslib */ "mrSG");
 /* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/core */ "fXoL");
 /* harmony import */ var _angular_common_http__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/common/http */ "IheW");
-/* harmony import */ var app_data__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! app/data */ "AVqD");
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! rxjs/operators */ "kU1M");
+/* harmony import */ var app_data__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! app/data */ "AVqD");
+
 
 
 
@@ -320,23 +334,54 @@ __webpack_require__.r(__webpack_exports__);
 let DataService = class DataService {
     constructor(http) {
         this.http = http;
-        this.mostPopularBook = app_data__WEBPACK_IMPORTED_MODULE_3__["allBooks"][0];
+        this.mostPopularBook = app_data__WEBPACK_IMPORTED_MODULE_4__["allBooks"][0];
     }
     setMostPopularBook(popularBook) {
         this.mostPopularBook = popularBook;
     }
     getAllReaders() {
-        return app_data__WEBPACK_IMPORTED_MODULE_3__["allReaders"];
+        return app_data__WEBPACK_IMPORTED_MODULE_4__["allReaders"];
     }
     getReaderById(id) {
-        return app_data__WEBPACK_IMPORTED_MODULE_3__["allReaders"].find(reader => reader.readerID === id);
+        return app_data__WEBPACK_IMPORTED_MODULE_4__["allReaders"].find(reader => reader.readerID === id);
     }
     getAllBooks() {
         console.log('Getting all books from the server.');
-        return this.http.get('/api/books');
+        return this.http.get('/api/books'); // gets books at /api/books and returns an array of Books
     }
     getBookById(id) {
-        return app_data__WEBPACK_IMPORTED_MODULE_3__["allBooks"].find(book => book.bookID === id);
+        return this.http.get(`/api/books/${id}`, {
+            headers: new _angular_common_http__WEBPACK_IMPORTED_MODULE_2__["HttpHeaders"]({
+                'Accept': 'application/json',
+                'Authorization': 'my-token'
+            })
+        });
+    }
+    getOldBookById(id) {
+        return this.http.get(`/api/books/${id}`)
+            .pipe(Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_3__["map"])(b => ({
+            bookTitle: b.title,
+            year: b.publicationYear
+        })), Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_3__["tap"])(classicBook => console.log(classicBook)) // prints selected book title and publication year in the console
+        );
+    }
+    addBook(newBook) {
+        return this.http.post('/api/books', newBook, {
+            headers: new _angular_common_http__WEBPACK_IMPORTED_MODULE_2__["HttpHeaders"]({
+                'Content-Type': 'application/json'
+            })
+        });
+    }
+    updateBook(updatedBook) {
+        // use put to update
+        return this.http.put(`/api/books/${updatedBook.bookID}`, updatedBook, {
+            headers: new _angular_common_http__WEBPACK_IMPORTED_MODULE_2__["HttpHeaders"]({
+                'Content-Type': 'application/json'
+            })
+        });
+    }
+    deleteBook(bookID) {
+        return this.http.delete(`/api/books/${bookID}`);
     }
 };
 DataService.ctorParameters = () => [
@@ -385,7 +430,11 @@ let DashboardComponent = class DashboardComponent {
         this.title.setTitle(`Book Tracker`);
     }
     deleteBook(bookID) {
-        console.warn(`Delete book not yet implemented (bookID: ${bookID}).`);
+        this.dataService.deleteBook(bookID)
+            .subscribe((data) => {
+            let index = this.allBooks.findIndex(book => book.bookID === bookID);
+            this.allBooks.splice(index, 1);
+        }, (err) => console.log(err), () => console.log("book deleted"));
     }
     deleteReader(readerID) {
         console.warn(`Delete reader not yet implemented (readerID: ${readerID}).`);
